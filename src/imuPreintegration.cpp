@@ -47,7 +47,27 @@ public:
         {
             try
             {
-                tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
+                /*
+                Sometimes waitForTransform() seems to return before the TF is actually available,
+                even though the nested canTransform() function, which is polled (*) within the former
+                reports that it is available. This seems to be a problem the tf library.
+
+                (*) looking at the source the polling period does not seem to be used at all:
+                https://github.com/ros/geometry/blob/63c3c7b404b8f390061bdadc5bc675e7ae5808be/tf/src/tf.cpp#L348-L351
+
+                The aforementioned behavior leads to the subsequent lookupTranform() to fail, which
+                by its turn generates bad algorithmic performance, since the empty transform is still used
+                even if not found. The problem can be correlated with the following warning:
+
+                   "TF to MSG: Quaternion Not Properly Normalized".
+
+                As a workaround, we poll the transformation explicitly at an apparent slower pace.
+                */
+                while (!tfListener.canTransform(lidarFrame, baselinkFrame, ros::Time(0)))
+                {
+                    ros::Duration(1.0).sleep();
+                }
+                // tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0), ros::Duration(1.0));
                 tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
             }
             catch (tf::TransformException ex)
