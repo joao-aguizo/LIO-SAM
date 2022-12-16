@@ -1,4 +1,5 @@
 #include "utility.h"
+#include "lio_sam/set_pose.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -31,12 +32,15 @@ public:
     ros::Publisher pubImuOdometry;
     ros::Publisher pubImuPath;
 
+    ros::ServiceServer srvSetMapToOdom;
+
     Eigen::Affine3f lidarOdomAffine;
     Eigen::Affine3f imuOdomAffineFront;
     Eigen::Affine3f imuOdomAffineBack;
 
     tf::TransformListener tfListener;
     tf::StampedTransform lidar2Baselink;
+    tf::Transform map_to_odom;
 
     double lidarOdomTime = -1;
     deque<nav_msgs::Odometry> imuOdomQueue;
@@ -78,9 +82,14 @@ public:
 
         subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
         subImuOdometry   = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental",   2000, &TransformFusion::imuOdometryHandler,   this, ros::TransportHints().tcpNoDelay());
+        
+        srvSetMapToOdom = nh.advertiseService("lio_sam/set_map_to_odom", &TransformFusion::setMapToOdomService, this);
 
         pubImuOdometry   = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
         pubImuPath       = nh.advertise<nav_msgs::Path>    ("lio_sam/imu/path", 1);
+
+        // default value of map_to_odom
+        map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
     }
 
     Eigen::Affine3f odom2affine(nav_msgs::Odometry odom)
@@ -108,7 +117,6 @@ public:
     {
         // static tf
         static tf::TransformBroadcaster tfMap2Odom;
-        static tf::Transform map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
         tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom, odomMsg->header.stamp, mapFrame, odometryFrame));
 
         std::lock_guard<std::mutex> lock(mtx);
@@ -170,6 +178,29 @@ public:
                 pubImuPath.publish(imuPath);
             }
         }
+    }
+
+    bool setMapToOdomService(lio_sam::set_pose::Request &req, lio_sam::set_pose::Response &res)
+    {
+        tf::Vector3 pt;
+        tf::Quaternion qt;
+
+        pt = tf::Vector3(
+            req.pose.pose.pose.position.x, 
+            req.pose.pose.pose.position.y, 
+            req.pose.pose.pose.position.z
+        );
+
+        // also checks for non-normalized quaternions, and normalizes if required.
+        tf::quaternionMsgToTF(req.pose.pose.pose.orientation, qt);
+        
+        // sets the transform
+        map_to_odom = tf::Transform(qt, pt);
+        
+        // fills result
+        res.success = true;
+
+        return true;
     }
 };
 

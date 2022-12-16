@@ -37,6 +37,7 @@ add_service_files(
   DIRECTORY srv
   FILES
   save_map.srv
+  set_pose.srv
 )
 
 generate_messages(
