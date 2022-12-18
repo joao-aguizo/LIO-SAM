@@ -1,0 +1,57 @@
+Bootstrap: docker
+From: osrf/ros:noetic-desktop-full-focal
+
+%environment
+    export LC_ALL=C
+
+%files
+    install/install_python3-catkin-tools.sh /install_python3-catkin-tools.sh
+
+%post
+    apt-get update
+
+    apt-get install -y \
+        wget \
+        moreutils \
+        vim \
+        nano \
+        zsh \
+        ranger \
+        tmux \
+        git
+
+    # install python3-catkin-tools
+    /bin/bash /install_python3-catkin-tools.sh
+
+    # install GTSAM lib (https://github.com/TixiaoShan/LIO-SAM#dependency)
+    apt-get install -y software-properties-common
+    add-apt-repository ppa:borglab/gtsam-release-4.0
+    apt install -y \
+        libgtsam-dev \
+        libgtsam-unstable-dev
+
+    SIM_LOCATION=/opt/image
+
+    # link configuration file for the env
+    ln -s $SIM_LOCATION/host/99-sim_env.sh /.singularity.d/env/99-sim_env.sh
+
+%test
+    exit 0
+
+%runscript
+    CMD="${@}"
+    
+    if [ -z "${CMD}" ]; then
+        /bin/bash --login
+    else
+        /bin/bash --login -c "${CMD}"
+    fi
+
+    exit 0
+
+%labels
+    Author joaoaguizo@gmail.com
+    Version v0.0.1
+
+%help
+    ROS Noetic Desktop Full installation w/ LIO-SAM dependecies and Python 3 catkin tools.
