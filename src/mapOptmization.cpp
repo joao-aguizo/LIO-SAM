@@ -364,6 +364,14 @@ public:
       // create directory and remove old files;
       int unused = system((std::string("exec rm -r ") + saveMapDirectory).c_str());
       unused = system((std::string("mkdir -p ") + saveMapDirectory).c_str());
+
+      // save loop closure indeces
+      {
+        std::ofstream ofs(saveMapDirectory + "/LoopIndexContainer.map");
+        boost::archive::text_oarchive oa(ofs);
+        oa << loopIndexContainer;
+      }
+
       // save key frame transformations
       pcl::io::savePCDFileBinary(saveMapDirectory + "/trajectory.pcd", *cloudKeyPoses3D);
       pcl::io::savePCDFileBinary(saveMapDirectory + "/transformations.pcd", *cloudKeyPoses6D);
