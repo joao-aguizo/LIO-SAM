@@ -92,6 +92,10 @@ lio_sam:
   globalMapVisualizationPoseDensity: 10.0       # meters, global map visualization keyframe density
   globalMapVisualizationLeafSize: 1.0           # meters, global map visualization cloud density
 
+  # Relocalization
+  loadPCD: false
+  loadPCDDirectory: "/scliosam/data/"
+  relocalizationMode: "PICP"
 
 
 

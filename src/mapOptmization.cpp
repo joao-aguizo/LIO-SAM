@@ -1,6 +1,7 @@
 #include "utility.h"
 #include "lio_sam/cloud_info.h"
 #include "lio_sam/save_map.h"
+#include "lio_sam/load_map.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -80,6 +81,7 @@ public:
     ros::Subscriber subLoop;
 
     ros::ServiceServer srvSaveMap;
+    ros::ServiceServer srvLoadMap;
 
     std::deque<nav_msgs::Odometry> gpsQueue;
     lio_sam::cloud_info cloudInfo;
@@ -172,6 +174,7 @@ public:
         subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
         srvSaveMap  = nh.advertiseService("lio_sam/save_map", &mapOptimization::saveMapService, this);
+        srvLoadMap  = nh.advertiseService("lio_sam/load_map", &mapOptimization::loadMapService, this);
 
         pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
         pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);
@@ -424,6 +427,11 @@ public:
       cout << "Saving map to pcd files completed\n" << endl;
 
       return true;
+    }
+
+    bool loadMapService(lio_sam::load_mapRequest& req, lio_sam::load_mapResponse& res)
+    {
+        return true;
     }
 
     void visualizeGlobalMapThread()

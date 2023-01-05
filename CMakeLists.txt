@@ -38,6 +38,7 @@ add_service_files(
   FILES
   save_map.srv
   set_pose.srv
+  load_map.srv
 )
 
 generate_messages(
