@@ -93,6 +93,8 @@ public:
     pcl::PointCloud<PointTypePose>::Ptr cloudKeyPoses6D;
     pcl::PointCloud<PointType>::Ptr copy_cloudKeyPoses3D;
     pcl::PointCloud<PointTypePose>::Ptr copy_cloudKeyPoses6D;
+    pcl::PointCloud<PointType>::Ptr load_cloudKeyPoses3D;
+    pcl::PointCloud<PointTypePose>::Ptr load_cloudKeyPoses6D;
 
     pcl::PointCloud<PointType>::Ptr laserCloudCornerLast; // corner feature set from odoOptimization
     pcl::PointCloud<PointType>::Ptr laserCloudSurfLast; // surf feature set from odoOptimization
@@ -144,6 +146,7 @@ public:
 
     bool aLoopIsClosed = false;
     map<int, int> loopIndexContainer; // from new to old
+    map<int, int> load_loopIndexContainer; // from new to old
     vector<pair<int, int>> loopIndexQueue;
     vector<gtsam::Pose3> loopPoseQueue;
     vector<gtsam::noiseModel::Diagonal::shared_ptr> loopNoiseQueue;
@@ -200,6 +203,8 @@ public:
         cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
         copy_cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
         copy_cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
+        load_cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
+        load_cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
 
         kdtreeSurroundingKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
         kdtreeHistoryKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
@@ -431,6 +436,48 @@ public:
 
     bool loadMapService(lio_sam::load_mapRequest& req, lio_sam::load_mapResponse& res)
     {
+        string loadMapDirectory;
+
+        cout << "****************************************************" << endl;
+        cout << "Loading map from pcd files ..." << endl;
+        if(req.destination.empty()) loadMapDirectory = std::getenv("HOME") + loadPCDDirectory;
+        else loadMapDirectory = std::getenv("HOME") + req.destination;
+        cout << "Load location: " << loadMapDirectory << endl;
+
+        res.success = false;
+
+        pcl::PointCloud<PointType>::Ptr tmp3D(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointTypePose>::Ptr tmp6D(new pcl::PointCloud<PointTypePose>());
+
+        // load the pcd files
+        if (pcl::io::loadPCDFile(loadMapDirectory + "/trajectory.pcd", *tmp3D) == -1 ||
+            pcl::io::loadPCDFile(loadMapDirectory + "/transformations.pcd", *tmp6D) == -1)
+        {
+            PCL_ERROR ("Failed to read pcd files\n");
+        }
+        else
+        {
+            *load_cloudKeyPoses3D = *tmp3D;
+            *load_cloudKeyPoses6D = *tmp6D;
+
+            // try load loop closure indeces
+            // OBS: this could be optional if we develop further reloc thecniques
+            try{
+                std::ifstream ifs(loadMapDirectory + "/LoopIndexContainer.map", std::ios::binary);
+                boost::archive::text_iarchive ia(ifs);
+                ia >> load_loopIndexContainer;
+                res.success = true;
+            }
+            catch(std::exception e){
+                ROS_ERROR("Failed to load loop closure indeces");
+                load_loopIndexContainer.clear();
+            }
+        }
+
+        string tmp = res.success ? "true" : "false";
+        cout << "Success: " << tmp << endl;
+        cout << "****************************************************" << endl;
+
         return true;
     }
 
