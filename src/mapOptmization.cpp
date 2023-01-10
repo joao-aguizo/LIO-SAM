@@ -574,6 +574,14 @@ public:
             if (mapLoaded == false)
                 continue;
 
+            /*
+            OBS: AFAIK, this relocalization strategy can only work if we assume that the odometry frame is common
+            between sessions (mapping and relocalization), since it iteratively transforms the current cloud 
+            in order to match with each loop closure position (TODO: pose) of the mapping session.
+            In other words, we also need to have an estimate of a global pose to which we can reference the
+            odometry frame (e.g. setup including GPS sensor). In addition, this information also needs to be
+            saved (if available) during the mapping session (this last point is also TODO).
+            */
             for (auto it = load_loopIndexContainer.begin(); it != load_loopIndexContainer.end(); ++it)
             {
                 int loopKeyCur = it->first;
