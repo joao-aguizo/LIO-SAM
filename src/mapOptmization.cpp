@@ -587,10 +587,11 @@ public:
                 pcl::PointCloud<PointType>::Ptr cureKeyframeCloud(new pcl::PointCloud<PointType>());
                 pcl::PointCloud<PointType>::Ptr prevKeyframeCloud(new pcl::PointCloud<PointType>());
                 {
-                    loopFindNearKeyframes(cureKeyframeCloud, 0, 0);
+                    loopFindNearKeyframes(cureKeyframeCloud, copy_cloudKeyPoses6D->size() - 1, 0);
+                    // loopFindNearKeyframes(cureKeyframeCloud, 0, 0);
                     loopFindNearKeyframes(prevKeyframeCloud, loopKeyPre, historyKeyframeSearchNum);
-                    // if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000)
-                    //     return true;
+                    if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000)
+                        continue; // this condition discards invalid clouds
                 }
 
                 Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
@@ -600,14 +601,27 @@ public:
                 std::cout << transform_2.matrix() << std::endl;
                 // Executing the transformation
                 pcl::PointCloud<PointType>::Ptr transformed_cloud (new pcl::PointCloud<PointType> ());
-                // You can either apply transform_1 or transform_2; they are the same
                 pcl::transformPointCloud (*cureKeyframeCloud, *transformed_cloud, transform_2);
 
-                publishCloud(pubDebugCloud, transformed_cloud, ros::Time::now(), odometryFrame);
-
-                ros::Duration(1.0).sleep();
-
                 // apply ICP to transformed cloud with prev* as target
+                // ICP Settings
+                static pcl::IterativeClosestPoint<PointType, PointType> icp;
+                icp.setMaxCorrespondenceDistance(historyKeyframeSearchRadius*2);
+                icp.setMaximumIterations(100);
+                icp.setTransformationEpsilon(1e-6);
+                icp.setEuclideanFitnessEpsilon(1e-6);
+                icp.setRANSACIterations(0);
+
+                // Align clouds
+                icp.setInputSource(transformed_cloud);
+                icp.setInputTarget(prevKeyframeCloud);
+                pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
+                icp.align(*unused_result);
+
+                if (icp.hasConverged() == true && !(icp.getFitnessScore() > historyKeyframeFitnessScore)){
+                    publishCloud(pubDebugCloud, unused_result, timeLaserInfoStamp, odometryFrame);
+                    break;
+                }
             }
             mapLoaded = false;
         }
