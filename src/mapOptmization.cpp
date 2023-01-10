@@ -69,6 +69,7 @@ public:
 
     ros::Publisher pubHistoryKeyFrames;
     ros::Publisher pubIcpKeyFrames;
+    ros::Publisher pubDebugCloud;
     ros::Publisher pubRecentKeyFrames;
     ros::Publisher pubRecentKeyFrame;
     ros::Publisher pubCloudRegisteredRaw;
@@ -136,6 +137,7 @@ public:
     std::mutex mtx;
     std::mutex mtxLoopInfo;
 
+    bool mapLoaded = false;
     bool isDegenerate = false;
     cv::Mat matP;
 
@@ -181,6 +183,7 @@ public:
 
         pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
         pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);
+        pubDebugCloud         = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/debugCloud", 1);
         pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/lio_sam/mapping/loop_closure_constraints", 1);
 
         pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 1);
@@ -467,6 +470,7 @@ public:
                 boost::archive::text_iarchive ia(ifs);
                 ia >> load_loopIndexContainer;
                 res.success = true;
+                mapLoaded = true;
             }
             catch(std::exception e){
                 ROS_ERROR("Failed to load loop closure indeces");
@@ -561,7 +565,53 @@ public:
 
 
 
+    void relocalizationThread()
+    {
+        ros::Rate rate(1.0);
+        while (ros::ok())
+        {
+            rate.sleep();
+            if (mapLoaded == false)
+                continue;
 
+            for (auto it = load_loopIndexContainer.begin(); it != load_loopIndexContainer.end(); ++it)
+            {
+                int loopKeyCur = it->first;
+                int loopKeyPre = it->second;
+                geometry_msgs::Point p;
+                p.x = load_cloudKeyPoses6D->points[loopKeyPre].x;
+                p.y = load_cloudKeyPoses6D->points[loopKeyPre].y;
+                p.z = load_cloudKeyPoses6D->points[loopKeyPre].z;
+
+                // extract cloud
+                pcl::PointCloud<PointType>::Ptr cureKeyframeCloud(new pcl::PointCloud<PointType>());
+                pcl::PointCloud<PointType>::Ptr prevKeyframeCloud(new pcl::PointCloud<PointType>());
+                {
+                    loopFindNearKeyframes(cureKeyframeCloud, 0, 0);
+                    loopFindNearKeyframes(prevKeyframeCloud, loopKeyPre, historyKeyframeSearchNum);
+                    // if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000)
+                    //     return true;
+                }
+
+                Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+                // Define a translation of 2.5 meters on the x axis.
+                transform_2.translation() << p.x, p.y, p.z;
+                // Print the transformation
+                std::cout << transform_2.matrix() << std::endl;
+                // Executing the transformation
+                pcl::PointCloud<PointType>::Ptr transformed_cloud (new pcl::PointCloud<PointType> ());
+                // You can either apply transform_1 or transform_2; they are the same
+                pcl::transformPointCloud (*cureKeyframeCloud, *transformed_cloud, transform_2);
+
+                publishCloud(pubDebugCloud, transformed_cloud, ros::Time::now(), odometryFrame);
+
+                ros::Duration(1.0).sleep();
+
+                // apply ICP to transformed cloud with prev* as target
+            }
+            mapLoaded = false;
+        }
+    }
 
     void loopClosureThread()
     {
@@ -1832,11 +1882,13 @@ int main(int argc, char** argv)
     
     std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
     std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);
+    std::thread relocalizeThread(&mapOptimization::relocalizationThread, &MO);
 
     ros::spin();
 
     loopthread.join();
     visualizeMapThread.join();
+    relocalizeThread.join();
 
     return 0;
 }
