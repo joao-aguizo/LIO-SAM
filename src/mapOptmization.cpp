@@ -581,6 +581,9 @@ public:
             In other words, we also need to have an estimate of a global pose to which we can reference the
             odometry frame (e.g. setup including GPS sensor). In addition, this information also needs to be
             saved (if available) during the mapping session (this last point is also TODO).
+
+            Other possibility would be to inject the mapping session's data into the appropriate variables, in order
+            to "continue" from where the previous session stopped.
             */
             for (auto it = load_loopIndexContainer.begin(); it != load_loopIndexContainer.end(); ++it)
             {
