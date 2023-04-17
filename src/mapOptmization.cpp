@@ -418,6 +418,33 @@ public:
       return true;
     }
 
+    bool loadMap()
+    {
+        string loadMapDirectory;
+
+        cout << "****************************************************" << endl;
+        cout << "Loading map from pcd files ..." << endl;
+        loadMapDirectory = std::getenv("HOME") + loadPCDDirectory;
+        cout << "Load location: " << loadMapDirectory << endl;
+
+        pcl::PointCloud<PointType>::Ptr tmp3D(new pcl::PointCloud<PointType>());
+        pcl::PointCloud<PointTypePose>::Ptr tmp6D(new pcl::PointCloud<PointTypePose>());
+
+        // load the pcd files
+        if (pcl::io::loadPCDFile(loadMapDirectory + "/trajectory.pcd", *tmp3D) == -1 ||
+            pcl::io::loadPCDFile(loadMapDirectory + "/transformations.pcd", *tmp6D) == -1)
+        {
+            PCL_ERROR ("Failed to read required pcd files!\n");
+            return false;
+        }
+
+        *load_cloudKeyPoses3D = *tmp3D;
+        *load_cloudKeyPoses6D = *tmp6D;
+        cout << "****************************************************" << endl;
+
+        return true;
+    }
+
     void visualizeGlobalMapThread()
     {
         ros::Rate rate(0.2);
@@ -1531,6 +1558,12 @@ public:
         PointType thisPose3D;
         PointTypePose thisPose6D;
         Pose3 latestEstimate;
+
+        //try load saved key poses
+        if (loadPCD && cloudKeyPoses3D->points.empty())
+        {
+            
+        }
 
         isamCurrentEstimate = isam->calculateEstimate();
         latestEstimate = isamCurrentEstimate.at<Pose3>(isamCurrentEstimate.size()-1);
