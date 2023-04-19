@@ -1563,14 +1563,6 @@ public:
         PointTypePose thisPose6D;
         Pose3 latestEstimate;
 
-        //try load saved key poses
-        if (loadPCD && cloudKeyPoses3D->points.empty())
-        {
-            loadMap();
-            *cloudKeyPoses3D = *load_cloudKeyPoses3D;
-            *cloudKeyPoses6D = *load_cloudKeyPoses6D;
-        }
-
         isamCurrentEstimate = isam->calculateEstimate();
         latestEstimate = isamCurrentEstimate.at<Pose3>(isamCurrentEstimate.size()-1);
         // cout << "****************************************************" << endl;
@@ -1617,6 +1609,18 @@ public:
 
         // save path for visualization
         updatePath(thisPose6D);
+
+        //try load saved key poses
+        if (loadPCD)
+        {
+            loadMap();
+            mtx.lock();
+            *cloudKeyPoses3D += *load_cloudKeyPoses3D;
+            *cloudKeyPoses6D += *load_cloudKeyPoses6D;
+            mtx.unlock();
+
+            loadPCD = false;
+        }
     }
 
     void correctPoses()
