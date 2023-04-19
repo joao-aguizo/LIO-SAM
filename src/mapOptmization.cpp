@@ -91,6 +91,8 @@ public:
     pcl::PointCloud<PointTypePose>::Ptr cloudKeyPoses6D;
     pcl::PointCloud<PointType>::Ptr copy_cloudKeyPoses3D;
     pcl::PointCloud<PointTypePose>::Ptr copy_cloudKeyPoses6D;
+    pcl::PointCloud<PointType>::Ptr load_cloudKeyPoses3D;
+    pcl::PointCloud<PointTypePose>::Ptr load_cloudKeyPoses6D;
 
     pcl::PointCloud<PointType>::Ptr laserCloudCornerLast; // corner feature set from odoOptimization
     pcl::PointCloud<PointType>::Ptr laserCloudSurfLast; // surf feature set from odoOptimization
@@ -197,6 +199,8 @@ public:
         cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
         copy_cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
         copy_cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
+        load_cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
+        load_cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
 
         kdtreeSurroundingKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
         kdtreeHistoryKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
@@ -1562,7 +1566,9 @@ public:
         //try load saved key poses
         if (loadPCD && cloudKeyPoses3D->points.empty())
         {
-            
+            loadMap();
+            *cloudKeyPoses3D = *load_cloudKeyPoses3D;
+            *cloudKeyPoses6D = *load_cloudKeyPoses6D;
         }
 
         isamCurrentEstimate = isam->calculateEstimate();
